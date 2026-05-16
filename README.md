@@ -1,4 +1,4 @@
-# CS153 — Thin Section Grain Segmentation
+# CS153 — Final Project Implementation
 
 Computer-vision pipeline that ingests a smartphone photograph of a
 petrographic thin section (cross-polarized light) and segments individual
