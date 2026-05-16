@@ -1,13 +1,15 @@
 """CLI: segment grains in a thin-section image using SAM.
 
-Usage:
+Examples:
     python segment.py path/to/image.jpg
+    python segment.py path/to/image.jpg --long-edge 1024 --points-per-side 16
     python segment.py path/to/image.jpg --model vit_b --min-area 500 --out outputs/run1
 """
 from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
 
 import cv2
@@ -29,10 +31,34 @@ def main() -> int:
         help="SAM backbone (vit_b is smallest / fastest)",
     )
     p.add_argument(
+        "--long-edge",
+        type=int,
+        default=1024,
+        help="Resize input so max(h,w)==this before SAM (0=disable). Default 1024.",
+    )
+    p.add_argument(
+        "--points-per-side",
+        type=int,
+        default=16,
+        help="SAM auto-mask grid density. 16 is ~4x faster than 32. Default 16.",
+    )
+    p.add_argument(
+        "--pred-iou-thresh",
+        type=float,
+        default=0.85,
+        help="SAM predicted-IoU floor for keeping a mask.",
+    )
+    p.add_argument(
+        "--stability-score-thresh",
+        type=float,
+        default=0.90,
+        help="SAM stability-score floor for keeping a mask.",
+    )
+    p.add_argument(
         "--min-area",
         type=int,
         default=200,
-        help="Drop grains smaller than this many pixels",
+        help="Drop grains smaller than this many ORIGINAL-resolution pixels",
     )
     p.add_argument(
         "--out",
@@ -52,12 +78,25 @@ def main() -> int:
     print(f"[segment] Reading {args.image}")
     image_rgb = read_image_rgb(args.image)
     h, w = image_rgb.shape[:2]
-    print(f"[segment] Image {w}x{h}, running SAM ({args.model})...")
+    long_edge = args.long_edge if args.long_edge > 0 else max(h, w)
+    print(
+        f"[segment] Image {w}x{h}, SAM={args.model}, long_edge={long_edge}, "
+        f"points_per_side={args.points_per_side}"
+    )
 
-    grains = segment_grains(image_rgb, model_type=args.model, min_area=args.min_area)
-    print(f"[segment] Found {len(grains)} grains (>= {args.min_area} px)")
+    t0 = time.perf_counter()
+    grains = segment_grains(
+        image_rgb,
+        model_type=args.model,
+        min_area=args.min_area,
+        long_edge=long_edge,
+        points_per_side=args.points_per_side,
+        pred_iou_thresh=args.pred_iou_thresh,
+        stability_score_thresh=args.stability_score_thresh,
+    )
+    elapsed = time.perf_counter() - t0
+    print(f"[segment] Found {len(grains)} grains (>= {args.min_area} px) in {elapsed:.1f}s")
 
-    # Write per-grain masks + manifest.
     manifest = []
     for g in grains:
         mask_path = masks_dir / f"grain_{g.index:04d}.png"
@@ -81,7 +120,12 @@ def main() -> int:
                 "image": str(args.image),
                 "image_size": [w, h],
                 "model": args.model,
+                "long_edge": long_edge,
+                "points_per_side": args.points_per_side,
+                "pred_iou_thresh": args.pred_iou_thresh,
+                "stability_score_thresh": args.stability_score_thresh,
                 "min_area": args.min_area,
+                "elapsed_sec": round(elapsed, 2),
                 "n_grains": len(grains),
                 "grains": manifest,
             },
