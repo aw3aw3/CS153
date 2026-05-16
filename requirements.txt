@@ -1,0 +1,11 @@
+numpy>=1.26
+opencv-python>=4.9
+pillow>=10.0
+matplotlib>=3.8
+
+# PyTorch (CPU). For CUDA, install from https://pytorch.org/ instead.
+torch>=2.2
+torchvision>=0.17
+
+# Segment Anything (Meta). Installed from GitHub for the latest version.
+segment-anything @ git+https://github.com/facebookresearch/segment-anything.git

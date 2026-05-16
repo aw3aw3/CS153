@@ -1,6 +1,25 @@
 # Claude Code local-only settings
 .claude/settings.local.json
 
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Project data + outputs (large / per-run)
+data/*
+!data/.gitkeep
+outputs/*
+!outputs/.gitkeep
+
+# Model checkpoints
+checkpoints/
+*.pth
+*.pt
+
 # OS junk
 Thumbs.db
 Desktop.ini
