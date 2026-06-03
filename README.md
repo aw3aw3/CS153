@@ -18,11 +18,14 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-A browser opens at `http://localhost:8501`. Drag in a thin-section image and you
-get: an **interactive mineral map you can hover** (each grain shows its predicted
-mineral, confidence and uncertainty), an uncertainty map, the modal mineralogy
-(area % / count %), a per-grain table, and a downloadable JSON report. That's the
-whole tool — no other setup needed (weights auto-download on first run).
+A browser opens at `http://localhost:8501`. Click **➕ New sample**, name it, and
+upload its **series of stage-rotation photos** (same field of view at different
+stage angles). Hit **Analyze sample** and you get: an **interactive mineral map
+you can hover** (each grain shows its predicted mineral, confidence and
+uncertainty), an uncertainty map, the modal mineralogy (area % / count %), a
+per-grain table, and a downloadable JSON report. The rotations are fused into one
+stronger prediction. Each analyzed sample is listed in the sidebar to revisit.
+No other setup needed (weights auto-download on first run).
 
 **Target rock type: granite.** The default mineral set is the `granite` preset —
 8 minerals (quartz, plagioclase, microcline, orthoclase, biotite, muscovite,
