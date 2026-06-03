@@ -29,12 +29,23 @@ from .minerals import DEFAULT_MINERALS, Mineral, build_prompts
 
 @dataclass
 class Prediction:
-    """One classifier result for one grain crop."""
+    """One classifier result for one grain crop.
+
+    Uncertainty fields (filled in by the pipeline / TTA wrapper):
+      entropy   normalized predictive entropy of ``scores`` in [0, 1];
+                0 = fully certain, 1 = uniform over all classes.
+      margin    top1 - top2 probability; small = the model is torn.
+      agreement fraction of test-time-augmented views that agreed with the
+                final label (1.0 when TTA is off / single view).
+    """
 
     label: str
     confidence: float
     # Full distribution over the label set (label -> probability), best first.
     scores: dict[str, float] = field(default_factory=dict)
+    entropy: float = 0.0
+    margin: float = 1.0
+    agreement: float = 1.0
 
 
 class MineralClassifier(Protocol):

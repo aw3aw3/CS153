@@ -22,7 +22,12 @@ from src.classify import build_classifier
 from src.minerals import resolve_preset
 from src.pipeline import analyze_thin_section
 from src.stats import format_table
-from src.viz import draw_mineral_overlay, mineral_color_map, save_distribution_chart
+from src.viz import (
+    draw_mineral_overlay,
+    draw_uncertainty_overlay,
+    mineral_color_map,
+    save_distribution_chart,
+)
 
 
 def main() -> int:
@@ -44,10 +49,19 @@ def main() -> int:
                    help="SAM auto-mask grid density (default 16)")
     p.add_argument("--min-area", type=int, default=200,
                    help="Drop grains smaller than this many original-res pixels")
-    p.add_argument("--min-confidence", type=float, default=0.0,
-                   help="Relabel predictions below this confidence as 'uncertain'")
     p.add_argument("--no-mask-bg", action="store_true",
                    help="Feed raw rectangular crops (don't grey out background)")
+    # --- uncertainty ---
+    p.add_argument("--tta", dest="tta", action="store_true", default=True,
+                   help="Test-time augmentation (rotations/flips). On by default.")
+    p.add_argument("--no-tta", dest="tta", action="store_false",
+                   help="Disable TTA (faster, but no agreement score)")
+    p.add_argument("--min-confidence", type=float, default=0.0,
+                   help="Flag grains below this top-probability as 'uncertain'")
+    p.add_argument("--max-entropy", type=float, default=1.0,
+                   help="Flag grains with normalized entropy above this (0-1)")
+    p.add_argument("--min-agreement", type=float, default=0.0,
+                   help="Flag grains whose TTA view-agreement is below this (0-1)")
     p.add_argument("--out", type=Path, default=None,
                    help="Output directory (default: outputs/<image_stem>_analysis)")
     args = p.parse_args()
@@ -79,7 +93,10 @@ def main() -> int:
         long_edge=long_edge,
         points_per_side=args.points_per_side,
         mask_background=not args.no_mask_bg,
+        tta=args.tta,
         min_confidence=args.min_confidence,
+        max_entropy=args.max_entropy,
+        min_agreement=args.min_agreement,
         progress=True,
     )
     elapsed = time.perf_counter() - t0
@@ -87,7 +104,9 @@ def main() -> int:
     summary = result.summary
     print()
     print(format_table(summary))
-    print(f"\n[analyze] {result.n_grains} grains classified in {elapsed:.1f}s")
+    n_unc = result.n_uncertain
+    print(f"\n[analyze] {result.n_grains} grains classified in {elapsed:.1f}s "
+          f"(TTA={'on' if args.tta else 'off'}; {n_unc} flagged uncertain)")
 
     # --- visual + data outputs ------------------------------------------------
     cmap = mineral_color_map([m.mineral for m in summary.minerals])
@@ -95,6 +114,10 @@ def main() -> int:
                                    result.predictions, cmap=cmap)
     cv2.imwrite(str(out_dir / "mineral_overlay.png"),
                 cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))
+    unc_overlay = draw_uncertainty_overlay(result.image_rgb, result.grains,
+                                           result.predictions)
+    cv2.imwrite(str(out_dir / "uncertainty_overlay.png"),
+                cv2.cvtColor(unc_overlay, cv2.COLOR_RGB2BGR))
     save_distribution_chart(summary, out_dir / "distribution.png", cmap=cmap)
 
     grains_json = [
@@ -104,7 +127,10 @@ def main() -> int:
             "area_px": g.area_px,
             "mineral": pred.label,
             "confidence": round(pred.confidence, 4),
-            "top3": dict(list(pred.scores.items())[:3]),
+            "entropy": round(pred.entropy, 4),
+            "margin": round(pred.margin, 4),
+            "agreement": round(pred.agreement, 4),
+            "top3": {k: round(v, 4) for k, v in list(pred.scores.items())[:3]},
         }
         for g, pred in zip(result.grains, result.predictions)
     ]
@@ -113,13 +139,20 @@ def main() -> int:
         "image_size": [result.image_rgb.shape[1], result.image_rgb.shape[0]],
         "backend": args.backend,
         "minerals_preset": args.minerals,
-        "min_confidence": args.min_confidence,
+        "tta": args.tta,
+        "uncertainty_thresholds": {
+            "min_confidence": args.min_confidence,
+            "max_entropy": args.max_entropy,
+            "min_agreement": args.min_agreement,
+        },
+        "n_uncertain": n_unc,
         "elapsed_sec": round(elapsed, 2),
         "modal_summary": summary.to_dict(),
         "grains": grains_json,
     }, indent=2))
 
-    print(f"[analyze] Wrote {out_dir}/ (mineral_overlay.png, distribution.png, summary.json)")
+    print(f"[analyze] Wrote {out_dir}/ (mineral_overlay.png, "
+          f"uncertainty_overlay.png, distribution.png, summary.json)")
     return 0
 
 

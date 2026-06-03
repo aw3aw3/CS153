@@ -60,6 +60,32 @@ def draw_mineral_overlay(
     return overlay
 
 
+def draw_uncertainty_overlay(
+    image_rgb: np.ndarray,
+    grains: list[Grain],
+    predictions: list[Prediction],
+    alpha: float = 0.55,
+) -> np.ndarray:
+    """Shade each grain green (certain) -> red (uncertain) by predictive entropy.
+
+    A quick visual triage map: red grains are where the model is least sure and
+    a human should look (or more stage-rotation images should be captured).
+    """
+    overlay = image_rgb.copy()
+    fill = np.zeros_like(overlay)
+    for g, p in zip(grains, predictions):
+        u = float(max(0.0, min(1.0, p.entropy)))  # 0 certain .. 1 uncertain
+        color = np.array([int(255 * u), int(255 * (1 - u)), 0], dtype=np.uint8)
+        fill[g.mask.astype(bool)] = color
+    overlay = cv2.addWeighted(overlay, 1.0 - alpha, fill, alpha, 0)
+    for g in grains:
+        contours, _ = cv2.findContours(
+            g.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
+        cv2.drawContours(overlay, contours, -1, (255, 255, 255), 1)
+    return overlay
+
+
 def save_distribution_chart(
     summary: ModalSummary,
     path: Path,

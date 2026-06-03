@@ -27,6 +27,7 @@ src/
   minerals.py       mineral vocabulary + zero-shot prompt templates
   classify.py       pluggable classifiers (CLIP / Claude / fine-tuned CNN)
   cnn.py            shared CNN architecture + transforms (train & inference)
+  uncertainty.py    test-time augmentation + entropy/margin/agreement
   stats.py          modal-mineralogy aggregation (count% / area%)
   viz.py            mineral-colored overlay + distribution chart
   pipeline.py       analyze_thin_section() — the importable entrypoint
@@ -84,16 +85,41 @@ python analyze.py img.jpg --backend claude        # needs ANTHROPIC_API_KEY
 
 Outputs land in `outputs/<image_stem>_analysis/`:
 - `mineral_overlay.png` — grains colored by predicted mineral
+- `uncertainty_overlay.png` — grains shaded green (certain) → red (uncertain)
 - `distribution.png` — area% / count% bar chart (colors match the overlay)
-- `summary.json` — modal summary + per-grain mineral, confidence, top-3 scores
+- `summary.json` — modal summary + per-grain mineral, confidence, **entropy,
+  margin, agreement**, and top-3 scores
 
 Key flags:
 - `--backend {clip,finetuned,claude}` — classifier (default `clip`)
 - `--checkpoint PATH` — trained-model weights for `--backend finetuned`
 - `--minerals {default,ultramafic}` — candidate mineral vocabulary (clip/claude)
-- `--min-confidence F` — relabel low-confidence grains as `uncertain`
 - `--model {vit_b,vit_l,vit_h}` — SAM backbone
 - `--min-area N`, `--long-edge N`, `--points-per-side N` — segmentation tuning
+
+### Uncertainty
+
+Every run reports per-grain uncertainty, and the pipeline can relabel shaky
+grains as `uncertain` instead of guessing:
+
+- **`--tta` / `--no-tta`** — test-time augmentation (default **on**): classifies
+  ~5 rotated/flipped views per grain and averages them (rotation is the
+  petrographically meaningful augmentation — minerals change under stage
+  rotation). Yields a per-grain `agreement` (view stability) and more robust,
+  better-calibrated probabilities.
+- Per-grain signals in `summary.json`: `entropy` (0–1, spread of the
+  distribution), `margin` (top1−top2), `agreement` (TTA view consensus).
+- Relabel thresholds (a grain → `uncertain` if it trips **any**):
+  `--min-confidence F`, `--max-entropy F` (0–1), `--min-agreement F` (0–1).
+
+```powershell
+# Flag grains the model isn't sure about (high entropy or unstable under rotation)
+python analyze.py img.jpg --backend finetuned --max-entropy 0.6 --min-agreement 0.6
+```
+
+The model is deliberately trained with label smoothing so confidences aren't
+wildly overconfident; on out-of-domain crops entropy stays high, so thresholds
+push them to `uncertain` rather than a confident wrong label.
 
 ### Training the fine-tuned classifier (MUMDMC2025)
 
@@ -121,12 +147,16 @@ A future upload UI should build the classifier **once** and reuse it:
 from src.classify import build_classifier
 from src.pipeline import analyze_thin_section
 
-clf = build_classifier("clip")                 # load weights once
-result = analyze_thin_section("img.jpg", classifier=clf)
+clf = build_classifier("finetuned")            # load weights once, reuse per upload
+result = analyze_thin_section(
+    "img.jpg", classifier=clf,
+    tta=True, max_entropy=0.6, min_agreement=0.6,   # uncertainty handling
+)
 
 print(result.summary.minerals[0].mineral)      # dominant mineral
+print(f"{result.n_uncertain}/{result.n_grains} grains uncertain")
 for s in result.summary.minerals:
-    print(s.mineral, f"{s.area_frac*100:.1f}% area")
+    print(s.mineral, f"{s.area_frac*100:.1f}% area  entropy={s.mean_entropy:.2f}")
 ```
 
 ### Segmentation only

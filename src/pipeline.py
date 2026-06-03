@@ -19,6 +19,7 @@ from .crops import crop_grains
 from .minerals import DEFAULT_MINERALS, Mineral
 from .segmentation import Grain, read_image_rgb, segment_grains
 from .stats import ModalSummary, summarize
+from .uncertainty import TTAClassifier, annotate, is_uncertain
 
 UNCERTAIN_LABEL = "uncertain"
 
@@ -34,16 +35,30 @@ class ThinSectionResult:
     def n_grains(self) -> int:
         return len(self.grains)
 
+    @property
+    def n_uncertain(self) -> int:
+        return sum(1 for p in self.predictions if p.label == UNCERTAIN_LABEL)
 
-def _apply_confidence_floor(
-    predictions: list[Prediction], min_confidence: float
+
+def _flag_uncertain(
+    predictions: list[Prediction],
+    min_confidence: float,
+    max_entropy: float,
+    min_agreement: float,
 ) -> list[Prediction]:
-    if min_confidence <= 0:
-        return predictions
-    return [
-        p if p.confidence >= min_confidence else replace(p, label=UNCERTAIN_LABEL)
-        for p in predictions
-    ]
+    """Annotate entropy/margin, then relabel grains that trip any threshold.
+
+    The original top call is preserved under ``scores`` so nothing is lost — only
+    the headline ``label`` becomes ``"uncertain"``.
+    """
+    out: list[Prediction] = []
+    for p in predictions:
+        p = annotate(p)
+        if is_uncertain(p, min_confidence, max_entropy, min_agreement):
+            out.append(replace(p, label=UNCERTAIN_LABEL))
+        else:
+            out.append(p)
+    return out
 
 
 def analyze_thin_section(
@@ -62,7 +77,11 @@ def analyze_thin_section(
     # crop / classification knobs
     crop_pad_frac: float = 0.15,
     mask_background: bool = True,
+    # uncertainty knobs
+    tta: bool = False,
     min_confidence: float = 0.0,
+    max_entropy: float = 1.0,
+    min_agreement: float = 0.0,
     progress: bool = False,
 ) -> ThinSectionResult:
     """Run the full pipeline on one thin-section image.
@@ -75,9 +94,15 @@ def analyze_thin_section(
         A ready :class:`MineralClassifier`. If ``None``, one is built from
         ``backend`` + ``minerals`` (default: local CLIP zero-shot). Pass your own
         to reuse loaded weights across many images.
-    min_confidence:
-        Predictions below this confidence are relabeled ``"uncertain"`` before
-        the summary is computed (0 disables — the default).
+    tta:
+        Test-time augmentation — classify several rotated/flipped views of each
+        grain and average them. Improves robustness and yields an ``agreement``
+        stability score per grain. Costs ~5x classifier inference.
+    min_confidence, max_entropy, min_agreement:
+        A grain is relabeled ``"uncertain"`` if its top probability is below
+        ``min_confidence``, OR its normalized entropy exceeds ``max_entropy``, OR
+        (with TTA) its view-agreement is below ``min_agreement``. Defaults
+        disable relabeling, but entropy/margin are always reported.
     """
     if isinstance(image, np.ndarray):
         image_rgb = image
@@ -104,15 +129,20 @@ def analyze_thin_section(
         log(f"Loading '{backend}' classifier...")
         classifier = build_classifier(backend, minerals=minerals)
 
+    if tta:
+        classifier = TTAClassifier(classifier)
+
     crops = crop_grains(
         image_rgb,
         grains,
         pad_frac=crop_pad_frac,
         mask_background=mask_background,
     )
-    log(f"Classifying {len(crops)} grain crops...")
+    log(f"Classifying {len(crops)} grain crops{' (TTA)' if tta else ''}...")
     predictions = classifier.classify(crops)
-    predictions = _apply_confidence_floor(predictions, min_confidence)
+    predictions = _flag_uncertain(
+        predictions, min_confidence, max_entropy, min_agreement
+    )
 
     summary = summarize(grains, predictions)
     log("Done.")

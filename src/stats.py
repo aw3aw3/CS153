@@ -22,6 +22,7 @@ class MineralStat:
     area_px: int
     area_frac: float
     mean_confidence: float
+    mean_entropy: float = 0.0
 
 
 @dataclass
@@ -50,11 +51,12 @@ def summarize(grains: list[Grain], predictions: list[Prediction]) -> ModalSummar
     agg: dict[str, dict[str, float]] = {}
     for g, p in zip(grains, predictions):
         a = agg.setdefault(
-            p.label, {"n": 0, "area": 0, "conf_sum": 0.0}
+            p.label, {"n": 0, "area": 0, "conf_sum": 0.0, "ent_sum": 0.0}
         )
         a["n"] += 1
         a["area"] += g.area_px
         a["conf_sum"] += p.confidence
+        a["ent_sum"] += p.entropy
 
     stats = [
         MineralStat(
@@ -64,6 +66,7 @@ def summarize(grains: list[Grain], predictions: list[Prediction]) -> ModalSummar
             area_px=int(a["area"]),
             area_frac=a["area"] / area_total if area_total else 0.0,
             mean_confidence=a["conf_sum"] / a["n"] if a["n"] else 0.0,
+            mean_entropy=a["ent_sum"] / a["n"] if a["n"] else 0.0,
         )
         for label, a in agg.items()
     ]
@@ -76,15 +79,16 @@ def summarize(grains: list[Grain], predictions: list[Prediction]) -> ModalSummar
 def format_table(summary: ModalSummary) -> str:
     """A compact text table for stdout."""
     lines = [
-        f"{'mineral':<22}{'grains':>7}{'count%':>9}{'area%':>9}{'mean conf':>11}",
-        "-" * 58,
+        f"{'mineral':<22}{'grains':>7}{'count%':>9}{'area%':>9}"
+        f"{'mean conf':>11}{'mean entropy':>14}",
+        "-" * 73,
     ]
     for s in summary.minerals:
         lines.append(
             f"{s.mineral:<22}{s.n_grains:>7}{s.count_frac * 100:>8.1f}%"
-            f"{s.area_frac * 100:>8.1f}%{s.mean_confidence:>11.2f}"
+            f"{s.area_frac * 100:>8.1f}%{s.mean_confidence:>11.2f}{s.mean_entropy:>14.2f}"
         )
-    lines.append("-" * 58)
+    lines.append("-" * 73)
     lines.append(
         f"{'TOTAL':<22}{summary.n_grains_total:>7}{'100.0%':>9}{'100.0%':>9}"
     )

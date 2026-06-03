@@ -159,6 +159,8 @@ def main() -> int:
     ap.add_argument("--epochs", type=int, default=6)
     ap.add_argument("--batch-size", type=int, default=64)
     ap.add_argument("--lr", type=float, default=1e-4)
+    ap.add_argument("--label-smoothing", type=float, default=0.1,
+                    help="Softens targets to curb overconfidence (better-calibrated)")
     ap.add_argument("--img-size", type=int, default=224)
     ap.add_argument("--val-frac", type=float, default=0.15)
     ap.add_argument("--polarization", choices=["both", "xpl", "ppl"], default="both")
@@ -203,7 +205,7 @@ def main() -> int:
 
     model = build_model(args.model, len(labels), pretrained=True).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
-    loss_fn = torch.nn.CrossEntropyLoss()
+    loss_fn = torch.nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
     scaler = torch.cuda.amp.GradScaler(enabled=(device == "cuda"))
 
     best_acc = 0.0
