@@ -26,6 +26,70 @@ from src.viz import draw_uncertainty_overlay, mineral_color_map
 st.set_page_config(page_title="Thin-Section Mineral Analyzer", page_icon="🔬",
                    layout="wide")
 
+# --- light, slick styling (visual only; no functional changes) -------------- #
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    html, body, [class*="css"], [data-testid="stMarkdownContainer"] {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .block-container { padding-top: 2.2rem; padding-bottom: 3rem; max-width: 1180px; }
+    h1 { font-weight: 700; letter-spacing: -0.6px; }
+    h2, h3 { font-weight: 600; letter-spacing: -0.3px; }
+
+    /* metric "cards" */
+    [data-testid="stMetric"] {
+        background: #FFFFFF;
+        border: 1px solid #E8ECF4;
+        border-radius: 14px;
+        padding: 14px 18px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    }
+    [data-testid="stMetricLabel"] p { color: #64748B; font-weight: 500; }
+
+    /* consistent, rounded buttons everywhere */
+    .stButton > button,
+    .stDownloadButton > button,
+    [data-testid="stFormSubmitButton"] button {
+        border-radius: 10px;
+        font-weight: 600;
+        border: 1px solid #E2E8F0;
+        transition: transform .12s ease, box-shadow .12s ease;
+    }
+    .stButton > button:hover,
+    .stDownloadButton > button:hover,
+    [data-testid="stFormSubmitButton"] button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.18);
+    }
+
+    /* sidebar */
+    [data-testid="stSidebar"] {
+        background: #FAFBFE;
+        border-right: 1px solid #EEF1F7;
+    }
+    [data-testid="stSidebar"] .stButton > button { width: 100%; text-align: left; }
+
+    /* the New-sample form as a soft card */
+    [data-testid="stForm"] {
+        border: 1px solid #E8ECF4;
+        border-radius: 16px;
+        padding: 1.2rem 1.4rem;
+        background: #FFFFFF;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    }
+
+    /* rounded tables, lighter chrome */
+    [data-testid="stDataFrame"] { border-radius: 12px; overflow: hidden; }
+    [data-testid="stHeader"] { background: transparent; }
+    #MainMenu, footer { visibility: hidden; }
+    hr { margin: 1.1rem 0; border-color: #EEF1F7; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 UPLOAD_TYPES = ["png", "jpg", "jpeg", "tif", "tiff", "bmp"]
 
 
@@ -201,8 +265,8 @@ def render_result(idx: int, record: dict) -> None:
 if st.session_state.view == "new":
     st.title("🔬 Thin-Section Mineral Analyzer")
     st.markdown(
-        "Identify the minerals in a **granite** thin section and measure its "
-        "modal mineralogy — with per-grain uncertainty."
+        "Identify the minerals in a thin section and measure its "
+        "modal mineralogy with per-grain uncertainty."
     )
     a, b, c = st.columns(3)
     a.markdown("**1 · New sample**\nName it and upload its photos.")
