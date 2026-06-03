@@ -228,31 +228,3 @@ for s in result.summary.minerals:
 ```powershell
 python segment.py data\my_thin_section.jpg
 ```
-
-## Notes & caveats
-
-- **Zero-shot (`clip`) accuracy is rough — even with the granite descriptions.**
-  Generic CLIP hasn't seen many thin sections, so confidences stay low (~0.2–0.3)
-  and entropy high. The diagnostic XPL descriptions in the `granite` preset are
-  the right lever and help at the margin (e.g. large quartz grains), but they
-  can't fully overcome zero-shot on this domain. The honest signal is the
-  uncertainty map, not the point labels.
-- **Unidentifiable grains.** Input is assumed granite (the 8 listed minerals).
-  Anything else still gets one of the 8 labels, but typically with high entropy /
-  low margin — set `--max-entropy` (or the dashboard cutoff) to push those to
-  `uncertain` instead of trusting them.
-- **The `finetuned` model is a proof of concept, not yet generalizable.** The
-  public MUMDMC2025 *sample* contains only **1–2 distinct crystals per mineral**
-  (imaged at many rotations), so high validation accuracy mostly reflects
-  rotation-robustness on *seen* crystals — not generalization to new thin
-  sections. Use `--split-by group` and the full 14,400-image release
-  (~20 crystals/mineral) for an honest cross-crystal evaluation.
-- **Domain gap in the pipeline.** The CNN is trained on clean, centered
-  single-mineral crops, but the pipeline feeds it SAM region-crops (background,
-  grain edges, fractures). It maps these to its 5 classes *confidently even when
-  wrong*. Next steps: train on SAM-style crops, add a background/"other" class,
-  and calibrate confidence (ties into the planned uncertainty milestone).
-- **Area % is the petrographic mode.** By the Delesse principle, area fraction in
-  a random section estimates volume fraction — the geologically meaningful number,
-  reported alongside grain count %.
-- Edit `src/minerals.py` to change the candidate mineral set for clip/claude.
