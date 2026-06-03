@@ -1,6 +1,7 @@
 """SAM-based grain segmentation for petrographic thin sections."""
 from __future__ import annotations
 
+import os
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,7 +26,13 @@ SAM_CHECKPOINTS = {
     ),
 }
 
-CHECKPOINT_DIR = Path(__file__).resolve().parent.parent / "checkpoints"
+# Heavy SAM weights (~375 MB–2.5 GB) can be kept off the (small) SSD / OneDrive
+# by setting CS153_CHECKPOINT_DIR — e.g. to a large secondary drive.
+CHECKPOINT_DIR = Path(
+    os.environ.get(
+        "CS153_CHECKPOINT_DIR", Path(__file__).resolve().parent.parent / "checkpoints"
+    )
+)
 
 
 @dataclass

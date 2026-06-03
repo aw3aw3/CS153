@@ -9,3 +9,10 @@ torchvision>=0.17
 
 # Segment Anything (Meta). Installed from GitHub for the latest version.
 segment-anything @ git+https://github.com/facebookresearch/segment-anything.git
+
+# Mineral classification — local CLIP zero-shot backend (default).
+open_clip_torch>=2.24
+
+# Optional: Claude-vision classifier backend (`--backend claude`).
+# Needs ANTHROPIC_API_KEY. Uncomment to install.
+# anthropic>=0.40
