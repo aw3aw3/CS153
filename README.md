@@ -154,6 +154,19 @@ model name, input size). Key flags: `--split-by {group,image}` (group = hold out
 whole crystals = honest eval), `--polarization {both,xpl,ppl}`, `--epochs`,
 `--model {resnet18,resnet34,resnet50}`, `--max-per-class`.
 
+### Background / non-grain handling
+
+SAM also segments things that aren't minerals — background, mounting epoxy,
+holes, image edges. These are detected **photometrically** (not by the
+classifier): under cross-polarized light, true background is *isotropic* — dark
+and unsaturated — while minerals show interference colors. Such grains are
+labeled `non-grain` and **excluded from the modal mineralogy** (reported
+separately). This is backend-agnostic and won't misclassify colorful grains.
+
+- `--keep-non-grain` — keep them in the percentages (default: exclude).
+- `--bg-dark-frac F` — a grain is `non-grain` if ≥ F of its pixels are
+  dark+unsaturated (default 0.6; lower = stricter).
+
 ### Programmatic entrypoint
 
 A future upload UI should build the classifier **once** and reuse it:

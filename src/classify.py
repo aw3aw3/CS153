@@ -74,6 +74,7 @@ class ClipZeroShotClassifier:
         pretrained: str = "laion2b_s34b_b79k",
         device: str | None = None,
         batch_size: int = 32,
+        include_non_grain: bool = False,
     ) -> None:
         import open_clip  # lazy: keep import cost off the segmentation-only path
         import torch
@@ -88,7 +89,9 @@ class ClipZeroShotClassifier:
         self.model.eval().to(self.device)
         tokenizer = open_clip.get_tokenizer(model_name)
 
-        names, prompts_per_name = build_prompts(minerals)
+        names, prompts_per_name = build_prompts(
+            minerals, include_non_grain=include_non_grain
+        )
         self.labels = names
 
         # Build one averaged, L2-normalized text feature per mineral.
@@ -156,7 +159,9 @@ class ClaudeVisionClassifier:
     ) -> None:
         import anthropic  # lazy
 
-        self.labels = [m.name for m in minerals]
+        from .minerals import NON_GRAIN_LABEL
+
+        self.labels = [m.name for m in minerals] + [NON_GRAIN_LABEL]
         self.model = model
         self.max_workers = max_workers
         self.max_edge = max_edge

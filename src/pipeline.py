@@ -15,8 +15,8 @@ from pathlib import Path
 import numpy as np
 
 from .classify import MineralClassifier, Prediction, build_classifier
-from .crops import crop_grains
-from .minerals import DEFAULT_MINERALS, Mineral
+from .crops import crop_grains, is_background
+from .minerals import DEFAULT_MINERALS, NON_GRAIN_LABEL, Mineral
 from .segmentation import Grain, read_image_rgb, segment_grains
 from .stats import ModalSummary, summarize
 from .uncertainty import TTAClassifier, annotate, is_uncertain
@@ -39,6 +39,10 @@ class ThinSectionResult:
     def n_uncertain(self) -> int:
         return sum(1 for p in self.predictions if p.label == UNCERTAIN_LABEL)
 
+    @property
+    def n_non_grain(self) -> int:
+        return sum(1 for p in self.predictions if p.label == NON_GRAIN_LABEL)
+
 
 def _flag_uncertain(
     predictions: list[Prediction],
@@ -54,7 +58,11 @@ def _flag_uncertain(
     out: list[Prediction] = []
     for p in predictions:
         p = annotate(p)
-        if is_uncertain(p, min_confidence, max_entropy, min_agreement):
+        # A confident "non-grain" call takes precedence: it gets excluded from
+        # the modal mineralogy, so don't dilute it into "uncertain".
+        if p.label == NON_GRAIN_LABEL:
+            out.append(p)
+        elif is_uncertain(p, min_confidence, max_entropy, min_agreement):
             out.append(replace(p, label=UNCERTAIN_LABEL))
         else:
             out.append(p)
@@ -82,6 +90,9 @@ def analyze_thin_section(
     min_confidence: float = 0.0,
     max_entropy: float = 1.0,
     min_agreement: float = 0.0,
+    # exclude background/epoxy/holes from the modal mineralogy
+    exclude_non_grain: bool = True,
+    bg_dark_frac: float = 0.6,
     progress: bool = False,
 ) -> ThinSectionResult:
     """Run the full pipeline on one thin-section image.
@@ -132,19 +143,42 @@ def analyze_thin_section(
     if tta:
         classifier = TTAClassifier(classifier)
 
+    # Photometric background detection: isotropic (dark + unsaturated) regions
+    # are background/epoxy/holes, not minerals. Flag them up front so we don't
+    # waste classifier calls on them and they stay out of the modal mineralogy.
+    if exclude_non_grain:
+        bg_flags = [is_background(image_rgb, g, dark_frac=bg_dark_frac) for g in grains]
+    else:
+        bg_flags = [False] * len(grains)
+    n_bg = sum(bg_flags)
+    if n_bg:
+        log(f"{n_bg} grains flagged as non-grain background (excluded).")
+
+    fg_grains = [g for g, bg in zip(grains, bg_flags) if not bg]
     crops = crop_grains(
         image_rgb,
-        grains,
+        fg_grains,
         pad_frac=crop_pad_frac,
         mask_background=mask_background,
     )
     log(f"Classifying {len(crops)} grain crops{' (TTA)' if tta else ''}...")
-    predictions = classifier.classify(crops)
-    predictions = _flag_uncertain(
-        predictions, min_confidence, max_entropy, min_agreement
+    fg_preds = classifier.classify(crops)
+    fg_preds = _flag_uncertain(
+        fg_preds, min_confidence, max_entropy, min_agreement
     )
 
-    summary = summarize(grains, predictions)
+    # Reassemble predictions aligned to the full grain list.
+    bg_pred = lambda: Prediction(
+        label=NON_GRAIN_LABEL, confidence=1.0, scores={NON_GRAIN_LABEL: 1.0},
+        entropy=0.0, margin=1.0, agreement=1.0,
+    )
+    predictions: list[Prediction] = []
+    it = iter(fg_preds)
+    for bg in bg_flags:
+        predictions.append(bg_pred() if bg else next(it))
+
+    exclude = (NON_GRAIN_LABEL,) if exclude_non_grain else ()
+    summary = summarize(grains, predictions, exclude_labels=exclude)
     log("Done.")
     return ThinSectionResult(
         image_rgb=image_rgb,

@@ -30,6 +30,8 @@ def mineral_color_map(labels: list[str]) -> dict[str, tuple[int, int, int]]:
     for label in labels:
         if label == "uncertain":
             cmap[label] = (110, 110, 110)
+        elif label == "non-grain":
+            cmap[label] = (40, 40, 40)  # near-black: background/epoxy/holes
         else:
             cmap[label] = _PALETTE[i % len(_PALETTE)]
             i += 1

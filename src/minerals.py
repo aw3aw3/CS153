@@ -66,17 +66,35 @@ PROMPT_TEMPLATES: tuple[str, ...] = (
 )
 
 
+# "Non-grain" catch-all: things SAM segments that are NOT mineral grains —
+# background, mounting epoxy, holes/cracks, image edges. Giving the zero-shot
+# classifier explicit prompts for these lets it route such crops here instead of
+# forcing them into a mineral class. Downstream they're excluded from the modal
+# mineralogy. Prompts share a "no crystal / empty / dark" theme for a clean
+# CLIP text centroid.
+NON_GRAIN_LABEL = "non-grain"
+NON_GRAIN_PROMPTS: tuple[str, ...] = (
+    "a dark isotropic background with no mineral crystal",
+    "plain black empty space under cross-polarized light",
+    "epoxy resin or mounting medium, not a mineral",
+    "an empty hole, crack, or void in the thin section",
+    "a blank featureless region of the slide",
+)
+
+
 def mineral_names(minerals: tuple[Mineral, ...] = DEFAULT_MINERALS) -> list[str]:
     return [m.name for m in minerals]
 
 
 def build_prompts(
     minerals: tuple[Mineral, ...] = DEFAULT_MINERALS,
+    include_non_grain: bool = False,
 ) -> tuple[list[str], list[list[str]]]:
     """Return ``(names, prompts_per_name)``.
 
     ``prompts_per_name[i]`` is the list of text prompts whose embeddings should
-    be averaged to form the classifier weight for ``names[i]``.
+    be averaged to form the classifier weight for ``names[i]``. When
+    ``include_non_grain`` is set, a trailing ``NON_GRAIN_LABEL`` class is added.
     """
     names: list[str] = []
     prompts_per_name: list[list[str]] = []
@@ -85,6 +103,9 @@ def build_prompts(
         prompts = [t.format(p) for p in phrases for t in PROMPT_TEMPLATES]
         names.append(m.name)
         prompts_per_name.append(prompts)
+    if include_non_grain:
+        names.append(NON_GRAIN_LABEL)
+        prompts_per_name.append(list(NON_GRAIN_PROMPTS))
     return names, prompts_per_name
 
 

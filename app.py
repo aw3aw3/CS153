@@ -57,10 +57,20 @@ max_entropy = st.sidebar.slider(
     help="Grains with normalized entropy ABOVE this are flagged 'uncertain'. "
          "1.0 = never flag. Lower it to be stricter.",
 )
+exclude_non_grain = st.sidebar.checkbox(
+    "Exclude background / non-grain", value=True,
+    help="Classify background, epoxy, holes and edges as 'non-grain' and leave "
+         "them OUT of the modal mineralogy. (clip/claude backends only.)",
+)
 with st.sidebar.expander("Segmentation (advanced)"):
     min_area = st.number_input("Min grain area (px)", 50, 5000, 200, 50)
     points_per_side = st.slider("SAM grid density", 8, 32, 16, 4)
     long_edge = st.slider("Resize long edge (px)", 512, 2048, 1024, 256)
+    bg_dark_frac = st.slider(
+        "Background sensitivity", 0.3, 0.9, 0.6, 0.05,
+        help="A grain is 'non-grain' if this fraction of its pixels are "
+             "dark+unsaturated. Lower = exclude more as background.",
+    )
 
 # --------------------------------------------------------------------------- #
 # Main
@@ -99,17 +109,24 @@ for upload in uploads:
             points_per_side=int(points_per_side),
             tta=tta,
             max_entropy=max_entropy,
+            exclude_non_grain=exclude_non_grain,
+            bg_dark_frac=bg_dark_frac,
         )
 
     summary = result.summary
-    cmap = mineral_color_map([m.mineral for m in summary.minerals])
+    # Colormap over every predicted label so non-grain/uncertain also render.
+    all_labels = [m.mineral for m in summary.minerals]
+    all_labels += [l for l in dict.fromkeys(p.label for p in result.predictions)
+                   if l not in all_labels]
+    cmap = mineral_color_map(all_labels)
 
     # Headline metrics
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Grains found", result.n_grains)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Mineral grains", result.n_grains - result.n_non_grain)
     top = summary.minerals[0].mineral if summary.minerals else "—"
     c2.metric("Dominant mineral (by area)", top)
-    c3.metric("Flagged uncertain", f"{result.n_uncertain} / {result.n_grains}")
+    c3.metric("Flagged uncertain", f"{result.n_uncertain}")
+    c4.metric("Non-grain excluded", f"{result.n_non_grain}")
 
     # Images
     i1, i2, i3 = st.columns(3)

@@ -62,6 +62,12 @@ def main() -> int:
                    help="Flag grains with normalized entropy above this (0-1)")
     p.add_argument("--min-agreement", type=float, default=0.0,
                    help="Flag grains whose TTA view-agreement is below this (0-1)")
+    p.add_argument("--keep-non-grain", action="store_true",
+                   help="Keep background/epoxy/holes in the modal % "
+                        "(default: detect + exclude them as 'non-grain')")
+    p.add_argument("--bg-dark-frac", type=float, default=0.6,
+                   help="A grain is 'non-grain' if at least this fraction of its "
+                        "pixels are dark+unsaturated (0-1). Lower = stricter.")
     p.add_argument("--out", type=Path, default=None,
                    help="Output directory (default: outputs/<image_stem>_analysis)")
     args = p.parse_args()
@@ -97,6 +103,8 @@ def main() -> int:
         min_confidence=args.min_confidence,
         max_entropy=args.max_entropy,
         min_agreement=args.min_agreement,
+        exclude_non_grain=not args.keep_non_grain,
+        bg_dark_frac=args.bg_dark_frac,
         progress=True,
     )
     elapsed = time.perf_counter() - t0
@@ -106,10 +114,16 @@ def main() -> int:
     print(format_table(summary))
     n_unc = result.n_uncertain
     print(f"\n[analyze] {result.n_grains} grains classified in {elapsed:.1f}s "
-          f"(TTA={'on' if args.tta else 'off'}; {n_unc} flagged uncertain)")
+          f"(TTA={'on' if args.tta else 'off'}; {n_unc} uncertain; "
+          f"{result.n_non_grain} non-grain excluded)")
 
     # --- visual + data outputs ------------------------------------------------
-    cmap = mineral_color_map([m.mineral for m in summary.minerals])
+    # Build the colormap over EVERY predicted label (minerals + uncertain +
+    # non-grain) so excluded categories still render in the overlay.
+    all_labels = [m.mineral for m in summary.minerals]
+    all_labels += [l for l in dict.fromkeys(p.label for p in result.predictions)
+                   if l not in all_labels]
+    cmap = mineral_color_map(all_labels)
     overlay = draw_mineral_overlay(result.image_rgb, result.grains,
                                    result.predictions, cmap=cmap)
     cv2.imwrite(str(out_dir / "mineral_overlay.png"),
@@ -146,6 +160,7 @@ def main() -> int:
             "min_agreement": args.min_agreement,
         },
         "n_uncertain": n_unc,
+        "n_non_grain_excluded": result.n_non_grain,
         "elapsed_sec": round(elapsed, 2),
         "modal_summary": summary.to_dict(),
         "grains": grains_json,

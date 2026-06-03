@@ -27,29 +27,54 @@ class MineralStat:
 
 @dataclass
 class ModalSummary:
-    n_grains_total: int
-    area_px_total: int
+    n_grains_total: int  # mineral grains only (excluded labels not counted)
+    area_px_total: int   # mineral area only
     minerals: list[MineralStat]  # sorted by area_frac, descending
+    # Non-grain / excluded categories (e.g. background), reported but NOT part
+    # of the modal percentages.
+    n_excluded: int = 0
+    area_excluded_px: int = 0
+    excluded_area_frac: float = 0.0  # excluded area / total segmented area
 
     def to_dict(self) -> dict:
         return {
             "n_grains_total": self.n_grains_total,
             "area_px_total": self.area_px_total,
             "minerals": [asdict(m) for m in self.minerals],
+            "n_excluded": self.n_excluded,
+            "area_excluded_px": self.area_excluded_px,
+            "excluded_area_frac": self.excluded_area_frac,
         }
 
 
-def summarize(grains: list[Grain], predictions: list[Prediction]) -> ModalSummary:
+def summarize(
+    grains: list[Grain],
+    predictions: list[Prediction],
+    exclude_labels: tuple[str, ...] = (),
+) -> ModalSummary:
+    """Aggregate predictions into modal mineralogy.
+
+    Grains whose label is in ``exclude_labels`` (e.g. ``"non-grain"``) are kept
+    OUT of the mineral percentages and reported separately — modal mineralogy is
+    over actual mineral grains only.
+    """
     if len(grains) != len(predictions):
         raise ValueError(
             f"grains ({len(grains)}) and predictions ({len(predictions)}) must align"
         )
 
-    n_total = len(grains)
-    area_total = sum(g.area_px for g in grains)
+    excluded = set(exclude_labels)
+    total_area_all = sum(g.area_px for g in grains)
+
+    # Partition into mineral grains vs excluded (non-grain) grains.
+    kept = [(g, p) for g, p in zip(grains, predictions) if p.label not in excluded]
+    dropped = [(g, p) for g, p in zip(grains, predictions) if p.label in excluded]
+
+    n_total = len(kept)
+    area_total = sum(g.area_px for g, _ in kept)
 
     agg: dict[str, dict[str, float]] = {}
-    for g, p in zip(grains, predictions):
+    for g, p in kept:
         a = agg.setdefault(
             p.label, {"n": 0, "area": 0, "conf_sum": 0.0, "ent_sum": 0.0}
         )
@@ -71,8 +96,15 @@ def summarize(grains: list[Grain], predictions: list[Prediction]) -> ModalSummar
         for label, a in agg.items()
     ]
     stats.sort(key=lambda s: s.area_frac, reverse=True)
+
+    area_excluded = sum(g.area_px for g, _ in dropped)
     return ModalSummary(
-        n_grains_total=n_total, area_px_total=area_total, minerals=stats
+        n_grains_total=n_total,
+        area_px_total=area_total,
+        minerals=stats,
+        n_excluded=len(dropped),
+        area_excluded_px=area_excluded,
+        excluded_area_frac=(area_excluded / total_area_all if total_area_all else 0.0),
     )
 
 
@@ -90,6 +122,12 @@ def format_table(summary: ModalSummary) -> str:
         )
     lines.append("-" * 73)
     lines.append(
-        f"{'TOTAL':<22}{summary.n_grains_total:>7}{'100.0%':>9}{'100.0%':>9}"
+        f"{'TOTAL (minerals)':<22}{summary.n_grains_total:>7}{'100.0%':>9}{'100.0%':>9}"
     )
+    if summary.n_excluded:
+        lines.append(
+            f"{'excluded non-grain':<22}{summary.n_excluded:>7}"
+            f"{'':>9}{summary.excluded_area_frac * 100:>8.1f}%"
+            f"   (of all segmented area; not in modal %)"
+        )
     return "\n".join(lines)

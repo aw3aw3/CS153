@@ -6,10 +6,45 @@ background so the classifier focuses on the grain itself.
 """
 from __future__ import annotations
 
+import cv2
 import numpy as np
 from PIL import Image
 
 from .segmentation import Grain
+
+
+def background_fraction(
+    image_rgb: np.ndarray,
+    grain: Grain,
+    value_thresh: int = 55,
+    sat_thresh: int = 45,
+) -> float:
+    """Fraction of a grain's pixels that look like isotropic background.
+
+    Under cross-polarized light, true background / mounting epoxy / holes stay
+    *dark and unsaturated* (they don't show interference colors), whereas mineral
+    grains light up. We flag a pixel as background if it's both dark (HSV value <
+    ``value_thresh``) and low-saturation (HSV saturation < ``sat_thresh``).
+    """
+    m = grain.mask.astype(bool)
+    if not m.any():
+        return 1.0
+    hsv = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2HSV)
+    s = hsv[..., 1][m]
+    v = hsv[..., 2][m]
+    dark_unsat = (v < value_thresh) & (s < sat_thresh)
+    return float(dark_unsat.mean())
+
+
+def is_background(
+    image_rgb: np.ndarray,
+    grain: Grain,
+    dark_frac: float = 0.6,
+    value_thresh: int = 55,
+    sat_thresh: int = 45,
+) -> bool:
+    """True if most of the grain reads as isotropic background (see above)."""
+    return background_fraction(image_rgb, grain, value_thresh, sat_thresh) >= dark_frac
 
 
 def _pad_bbox(
