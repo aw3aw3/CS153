@@ -7,15 +7,29 @@ section (cross-polarized light), **segments** individual mineral grains,
 
 ```
 image  →  SAM segmentation  →  per-grain crops  →  mineral classifier
-       →  count% / area% summary  +  visual outputs
+       →  count% / area% summary  +  per-grain uncertainty  +  visual outputs
 ```
+
+## Quick start (dashboard)
+
+```powershell
+conda activate cs153
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+A browser opens at `http://localhost:8501`. Drag in a thin-section image and you
+get: a mineral-colored overlay, an uncertainty map, the modal mineralogy
+(area % / count %), a per-grain table, and a downloadable JSON report. That's the
+whole tool — no other setup needed (weights auto-download on first run).
 
 The classifier is **pluggable** (all backends share one `classify(crops)`
 interface, so the pipeline is unchanged when you switch):
 - **`clip`** (default) — local CLIP zero-shot. No training/labels; scores each
-  crop against text prompts per mineral. Runs today.
-- **`finetuned`** — a CNN trained on labeled thin-section crops
-  (see *Training* below). Higher accuracy in-domain.
+  crop against text prompts per mineral. Works on **any** rock type. This is the
+  recommended default.
+- **`finetuned`** — a CNN trained on labeled thin-section crops (experimental;
+  only 5 granite minerals — see *Training* and the caveats below).
 - **`claude`** — Claude vision API (optional; needs `ANTHROPIC_API_KEY`).
 
 ## Layout
@@ -31,6 +45,7 @@ src/
   stats.py          modal-mineralogy aggregation (count% / area%)
   viz.py            mineral-colored overlay + distribution chart
   pipeline.py       analyze_thin_section() — the importable entrypoint
+app.py              Streamlit dashboard (upload → analyze → results)
 segment.py          CLI: segmentation only
 analyze.py          CLI: full segment + classify + summarize
 train_classifier.py CLI: fine-tune the CNN backend on labeled crops

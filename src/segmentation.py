@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import urllib.request
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 import cv2
@@ -58,6 +59,18 @@ def ensure_checkpoint(model_type: str) -> Path:
     return path
 
 
+@lru_cache(maxsize=2)
+def _load_sam_model(model_type: str):
+    """Load + cache the heavy SAM weights (≈358 MB) once per model type, so
+    repeated analyses (e.g. a dashboard processing many uploads) don't re-read
+    them from disk every time."""
+    ckpt = ensure_checkpoint(model_type)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    sam = sam_model_registry[model_type](checkpoint=str(ckpt))
+    sam.to(device=device)
+    return sam
+
+
 def load_sam(
     model_type: str = "vit_b",
     points_per_side: int = 16,
@@ -65,10 +78,9 @@ def load_sam(
     stability_score_thresh: float = 0.90,
     min_mask_region_area: int = 200,
 ) -> SamAutomaticMaskGenerator:
-    ckpt = ensure_checkpoint(model_type)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    sam = sam_model_registry[model_type](checkpoint=str(ckpt))
-    sam.to(device=device)
+    # Model is cached; the lightweight mask-generator wrapper is rebuilt each call
+    # so per-image params (min_mask_region_area) still apply.
+    sam = _load_sam_model(model_type)
     return SamAutomaticMaskGenerator(
         model=sam,
         points_per_side=points_per_side,
