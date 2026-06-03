@@ -113,6 +113,22 @@ def resize_to_long_edge(
     return resized, scale
 
 
+def _occupies_corner(mask: np.ndarray, k: int) -> bool:
+    """True if the mask covers any of the four image corners.
+
+    Petrographic photomicrographs have a circular field of view, so the four
+    rectangular corners are outside it (dark) and SAM segments them. Such regions
+    are never mineral grains and must be dropped. Checks a small k×k patch at each
+    corner (not just the single corner pixel) to be robust to 1-px gaps.
+    """
+    h, w = mask.shape
+    k = max(1, min(k, h, w))
+    return bool(
+        mask[:k, :k].any() or mask[:k, w - k:].any()
+        or mask[h - k:, :k].any() or mask[h - k:, w - k:].any()
+    )
+
+
 def segment_grains(
     image_rgb: np.ndarray,
     model_type: str = "vit_b",
@@ -121,9 +137,14 @@ def segment_grains(
     points_per_side: int = 16,
     pred_iou_thresh: float = 0.85,
     stability_score_thresh: float = 0.90,
+    drop_corners: bool = True,
 ) -> list[Grain]:
     """Run SAM auto-mask-gen at a downsampled resolution, then rescale masks
-    back to the original image size. min_area is enforced in ORIGINAL pixels."""
+    back to the original image size. min_area is enforced in ORIGINAL pixels.
+
+    ``drop_corners`` (default True) removes any segment touching an image corner —
+    these are the dark areas outside the circular microscope field of view, never
+    mineral grains."""
     h0, w0 = image_rgb.shape[:2]
     resized, scale = resize_to_long_edge(image_rgb, long_edge)
     if scale != 1.0:
@@ -141,6 +162,9 @@ def segment_grains(
     raw = mask_generator.generate(resized)
     raw.sort(key=lambda m: m["area"], reverse=True)
 
+    # Corner patch size: ~1.5% of the short edge (min 3 px).
+    corner_k = max(3, int(round(0.015 * min(h0, w0))))
+
     grains: list[Grain] = []
     for i, m in enumerate(raw):
         small_mask = m["segmentation"].astype(np.uint8)
@@ -151,6 +175,8 @@ def segment_grains(
         area = int(mask.sum())
         if area < min_area:
             continue
+        if drop_corners and _occupies_corner(mask, corner_k):
+            continue  # dark corner outside the circular FOV — never a grain
         ys, xs = np.where(mask > 0)
         if xs.size == 0:
             continue
