@@ -13,6 +13,40 @@ from PIL import Image
 from .segmentation import Grain
 
 
+def align_to_reference(
+    ref_rgb: np.ndarray, img_rgb: np.ndarray, max_dim: int = 512
+) -> np.ndarray:
+    """Align ``img_rgb`` onto ``ref_rgb`` with an ECC affine warp.
+
+    Used for multi-view fusion: when several photos of the SAME field of view are
+    uploaded, this brings them into the reference frame so one set of grain masks
+    applies to all. Estimated on downscaled grayscale (affine handles small
+    shift/rotation/scale). Falls back to the unaligned image if ECC fails to
+    converge (e.g. the images aren't actually the same field).
+    """
+    if ref_rgb.shape == img_rgb.shape and np.array_equal(ref_rgb, img_rgb):
+        return img_rgb
+    g1 = cv2.cvtColor(ref_rgb, cv2.COLOR_RGB2GRAY)
+    g2 = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
+    H, W = g1.shape
+    scale = min(1.0, max_dim / max(H, W))
+    s1 = cv2.resize(g1, (int(W * scale), int(H * scale)))
+    s2 = cv2.resize(g2, (int(W * scale), int(H * scale)))
+    warp = np.eye(2, 3, dtype=np.float32)
+    criteria = (cv2.TERM_CRITERIA_COUNT | cv2.TERM_CRITERIA_EPS, 100, 1e-4)
+    try:
+        _, warp = cv2.findTransformECC(s1, s2, warp, cv2.MOTION_AFFINE, criteria, None, 5)
+    except cv2.error:
+        return img_rgb  # could not align; caller still uses it (may warn)
+    warp[0, 2] /= scale  # rescale translation to full resolution
+    warp[1, 2] /= scale
+    return cv2.warpAffine(
+        img_rgb, warp, (W, H),
+        flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP,
+        borderMode=cv2.BORDER_REPLICATE,
+    )
+
+
 def background_fraction(
     image_rgb: np.ndarray,
     grain: Grain,

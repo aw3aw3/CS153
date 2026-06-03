@@ -164,6 +164,29 @@ model name, input size). Key flags: `--split-by {group,image}` (group = hold out
 whole crystals = honest eval), `--polarization {both,xpl,ppl}`, `--epochs`,
 `--model {resnet18,resnet34,resnet50}`, `--max-per-class`.
 
+### Multi-view fusion (stronger predictions)
+
+Upload several images of the **same field of view** (e.g. different stage
+rotations, focus, or exposure) and the tool fuses them into one stronger result:
+
+- Grains are segmented on the first (reference) image; the others are aligned to
+  it (ECC affine) and the **same masks** are reused.
+- Each grain is classified in every view and the probability distributions are
+  **averaged** — more views → steadier estimate, and views that *disagree* push
+  the grain toward `uncertain` (per-grain `agreement` = cross-view consensus).
+
+In the dashboard, uploading 2+ images shows a **"Combine as multiple views"**
+option (default). Programmatically:
+
+```python
+from src.pipeline import analyze_thin_section_multi
+result = analyze_thin_section_multi(["rot0.jpg", "rot30.jpg", "rot60.jpg"],
+                                    classifier=clf, align=True)
+```
+
+Example: a quartz crystal where a *single* view ranked quartz 3rd (27 % area)
+came out **quartz-dominant (59 %)** after fusing three rotation views.
+
 ### Background / non-grain handling
 
 SAM also segments things that aren't minerals — background, mounting epoxy,
