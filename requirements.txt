@@ -16,6 +16,7 @@ open_clip_torch>=2.24
 # Dashboard / UI
 streamlit>=1.30
 pandas>=2.0
+plotly>=5.18
 
 # Optional: Claude-vision classifier backend (`--backend claude`).
 # Needs ANTHROPIC_API_KEY. Uncomment to install.

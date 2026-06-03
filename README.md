@@ -19,7 +19,8 @@ streamlit run app.py
 ```
 
 A browser opens at `http://localhost:8501`. Drag in a thin-section image and you
-get: a mineral-colored overlay, an uncertainty map, the modal mineralogy
+get: an **interactive mineral map you can hover** (each grain shows its predicted
+mineral, confidence and uncertainty), an uncertainty map, the modal mineralogy
 (area % / count %), a per-grain table, and a downloadable JSON report. That's the
 whole tool — no other setup needed (weights auto-download on first run).
 

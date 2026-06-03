@@ -17,9 +17,10 @@ import streamlit as st
 from PIL import Image
 
 from src.classify import build_classifier
+from src.interactive import build_mineral_figure
 from src.minerals import resolve_preset
 from src.pipeline import analyze_thin_section
-from src.viz import draw_mineral_overlay, draw_uncertainty_overlay, mineral_color_map
+from src.viz import draw_uncertainty_overlay, mineral_color_map
 
 st.set_page_config(page_title="Thin-Section Mineral Analyzer", layout="wide")
 
@@ -128,14 +129,17 @@ for upload in uploads:
     c3.metric("Flagged uncertain", f"{result.n_uncertain}")
     c4.metric("Non-grain excluded", f"{result.n_non_grain}")
 
-    # Images
-    i1, i2, i3 = st.columns(3)
+    # Interactive mineral map — hover any grain to see its prediction.
+    st.markdown("**Predicted minerals** — hover a grain for its label, "
+                "confidence and uncertainty")
+    fig = build_mineral_figure(result.image_rgb, result.grains,
+                               result.predictions, cmap)
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Static reference images
+    i1, i2 = st.columns(2)
     i1.image(image_rgb, caption="Original", use_container_width=True)
     i2.image(
-        draw_mineral_overlay(result.image_rgb, result.grains, result.predictions, cmap=cmap),
-        caption="Predicted minerals", use_container_width=True,
-    )
-    i3.image(
         draw_uncertainty_overlay(result.image_rgb, result.grains, result.predictions),
         caption="Uncertainty (green=sure, red=unsure)", use_container_width=True,
     )
