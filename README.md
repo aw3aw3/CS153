@@ -44,9 +44,12 @@ thin-section dataset** (Menoufia University, CC-BY 4.0). Details:
 - **Classes:** quartz, plagioclase, orthoclase (K-feldspar), biotite, hornblende
   — the granite minerals with labeled training data available.
 - **Method:** transfer learning (Adam, cross-entropy with **label smoothing** for
-  calibrated confidences), with rotation/flip/crop/colour-jitter augmentation;
-  **100 % held-out validation accuracy**. Inference uses **test-time
-  augmentation** (averaging several rotated views per grain) for robustness.
+  calibrated confidences), with rotation/flip/crop/colour-jitter augmentation
+  **plus grain-mask augmentation** — training crops are masked onto the same grey
+  background the segmentation pipeline produces, so the model trains under the
+  conditions it sees at inference (no train/inference domain gap). **100 %
+  held-out validation accuracy**. Inference uses **test-time augmentation**
+  (averaging several rotated views per grain) for robustness.
 - **Shipped:** the trained weights (`checkpoints/mineral_cnn.pt`) are included in
   the repo, so the app works out of the box — no training step needed.
 
