@@ -134,9 +134,9 @@ with st.sidebar:
     st.divider()
     st.markdown("**Model settings**")
     backend = st.selectbox(
-        "Classifier", ["clip", "finetuned"],
-        help="clip = zero-shot, works on any rock (default). "
-             "finetuned = trained CNN (experimental, 5 granite minerals).",
+        "Classifier", ["finetuned", "clip"],
+        help="finetuned = trained ResNet-18 CNN (default). "
+             "clip = zero-shot fallback that works on any rock.",
     )
     preset = st.selectbox(
         "Mineral set", ["granite", "default", "ultramafic"],

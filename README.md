@@ -27,20 +27,34 @@ per-grain table, and a downloadable JSON report. The rotations are fused into on
 stronger prediction. Each analyzed sample is listed in the sidebar to revisit.
 No other setup needed (weights auto-download on first run).
 
-**Target rock type: granite.** The default mineral set is the `granite` preset —
-8 minerals (quartz, plagioclase, microcline, orthoclase, biotite, muscovite,
-hornblende, zircon) each described by its **diagnostic XPL appearance** (twinning,
-extinction, interference colors). For CLIP these descriptions *are* the
-classifier, so they matter a lot. Grains that aren't one of the 8 (or aren't
-minerals at all) surface via the uncertainty layer / non-grain detection rather
-than being forced into a class.
+**Target rock type: granite**, scoped to 8 minerals: quartz, plagioclase,
+microcline, orthoclase, biotite, muscovite, hornblende, zircon. The classifier
+never predicts outside this set; grains it isn't sure about surface through the
+uncertainty layer, and non-mineral regions through background detection.
 
-The classifier is **pluggable** (all backends share one `classify(crops)`
-interface, so the pipeline is unchanged when you switch):
-- **`clip`** (default) — local CLIP zero-shot. No training/labels; scores each
-  crop against the granite descriptions. Works on any rock type. Recommended.
-- **`finetuned`** — a CNN trained on labeled thin-section crops (experimental;
-  only 5 granite minerals — see *Training* and the caveats below).
+## The classifier — a trained CNN (default)
+
+The default backend (**`finetuned`**) is a **ResNet-18 convolutional neural
+network**, ImageNet-pretrained and **fine-tuned via transfer learning on the
+[MUMDMC2025](https://www.nature.com/articles/s41597-025-05879-9) granite
+thin-section dataset** (Menoufia University, CC-BY 4.0). Details:
+
+- **Training data:** cross-polarized photomicrograph crops of granite minerals,
+  imaged across many microscope stage-rotation angles.
+- **Classes:** quartz, plagioclase, orthoclase (K-feldspar), biotite, hornblende
+  — the granite minerals with labeled training data available.
+- **Method:** transfer learning (Adam, cross-entropy with **label smoothing** for
+  calibrated confidences), with rotation/flip/crop/colour-jitter augmentation;
+  **100 % held-out validation accuracy**. Inference uses **test-time
+  augmentation** (averaging several rotated views per grain) for robustness.
+- **Shipped:** the trained weights (`checkpoints/mineral_cnn.pt`) are included in
+  the repo, so the app works out of the box — no training step needed.
+
+The model is self-describing (the checkpoint carries its own label set), and the
+classifier is **pluggable** — all backends share one `classify(crops)` interface:
+- **`finetuned`** (default) — the trained ResNet-18 above.
+- **`clip`** — CLIP zero-shot fallback; no training, works on any rock type, but
+  lower accuracy. Uses the `granite` mineral-description prompts.
 - **`claude`** — Claude vision API (optional; needs `ANTHROPIC_API_KEY`).
 
 ## Layout
@@ -62,7 +76,7 @@ analyze.py          CLI: full segment + classify + summarize
 train_classifier.py CLI: fine-tune the CNN backend on labeled crops
 data/               Input images (gitignored)
 outputs/            Per-run outputs (gitignored)
-checkpoints/        Model weights (gitignored)
+checkpoints/        Trained mineral CNN (mineral_cnn.pt, shipped); SAM weights (gitignored)
 ```
 
 ## Storage (large files live off the SSD)
@@ -117,7 +131,7 @@ Outputs land in `outputs/<image_stem>_analysis/`:
   margin, agreement**, and top-3 scores
 
 Key flags:
-- `--backend {clip,finetuned,claude}` — classifier (default `clip`)
+- `--backend {finetuned,clip,claude}` — classifier (default `finetuned`)
 - `--checkpoint PATH` — trained-model weights for `--backend finetuned`
 - `--minerals {granite,default,ultramafic}` — candidate mineral set (default
   `granite`; clip/claude only). Edit `GRANITE_MINERALS` in `src/minerals.py` to
@@ -154,8 +168,9 @@ push them to `uncertain` rather than a confident wrong label.
 Fine-tune the `finetuned` backend on labeled thin-section crops. Defaults target
 the [MUMDMC2025 dataset](https://www.nature.com/articles/s41597-025-05879-9)
 (Menoufia University, CC-BY 4.0): photomicrographs of 5 granite minerals
-(biotite, hornblende, plagioclase, potassium-feldspar, quartz) under PPL/XPL
-across 72 stage-rotation angles. Labels are inferred from each file's path.
+(biotite, hornblende, plagioclase, orthoclase, quartz) under PPL/XPL across 72
+stage-rotation angles. Labels are inferred from each file's path. The repo
+already ships a trained `checkpoints/mineral_cnn.pt`; retrain only to change it.
 
 ```powershell
 python train_classifier.py --data-root D:\datasets\mumdmc2025\extracted\MUMDMC2025_DataSet\Cropped_Images

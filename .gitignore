@@ -15,10 +15,13 @@ data/*
 outputs/*
 !outputs/.gitkeep
 
-# Model checkpoints
+# Model checkpoints (large / auto-downloaded) — but DO ship the trained
+# mineral classifier so the app works out of the box.
 checkpoints/
 *.pth
 *.pt
+!checkpoints/
+!checkpoints/mineral_cnn.pt
 
 # OS junk
 Thumbs.db

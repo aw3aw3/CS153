@@ -34,9 +34,9 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("image", type=Path, help="Path to thin-section image")
-    p.add_argument("--backend", choices=["clip", "claude", "finetuned"], default="clip",
-                   help="Classifier backend (clip=local zero-shot default; "
-                        "finetuned=trained CNN; claude=vision API)")
+    p.add_argument("--backend", choices=["clip", "claude", "finetuned"], default="finetuned",
+                   help="Classifier backend (finetuned=trained CNN, default; "
+                        "clip=zero-shot fallback; claude=vision API)")
     p.add_argument("--checkpoint", type=Path, default=Path("checkpoints/mineral_cnn.pt"),
                    help="Trained-model checkpoint for --backend finetuned")
     p.add_argument("--minerals", default="granite",

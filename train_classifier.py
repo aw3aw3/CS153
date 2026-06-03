@@ -31,9 +31,11 @@ MINERAL_TOKENS: dict[str, tuple[str, ...]] = {
     "biotite": ("biotite",),
     "hornblende": ("hornblende",),
     "plagioclase": ("plagioclase",),
-    "potassium feldspar": (
+    # MUMDMC2025's "Potassium_Feldspar" is labeled orthoclase (one of the 8
+    # target granite minerals; the generic K-feldspar of the suite).
+    "orthoclase": (
         "potassium-feldspar", "potassium_feldspar", "potassiumfeldspar",
-        "potassium feldspar", "k-feldspar", "kfeldspar", "k_feldspar",
+        "potassium feldspar", "k-feldspar", "kfeldspar", "k_feldspar", "orthoclase",
     ),
     "quartz": ("quartz",),
 }
