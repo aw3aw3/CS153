@@ -23,11 +23,18 @@ get: a mineral-colored overlay, an uncertainty map, the modal mineralogy
 (area % / count %), a per-grain table, and a downloadable JSON report. That's the
 whole tool — no other setup needed (weights auto-download on first run).
 
+**Target rock type: granite.** The default mineral set is the `granite` preset —
+8 minerals (quartz, plagioclase, microcline, orthoclase, biotite, muscovite,
+hornblende, zircon) each described by its **diagnostic XPL appearance** (twinning,
+extinction, interference colors). For CLIP these descriptions *are* the
+classifier, so they matter a lot. Grains that aren't one of the 8 (or aren't
+minerals at all) surface via the uncertainty layer / non-grain detection rather
+than being forced into a class.
+
 The classifier is **pluggable** (all backends share one `classify(crops)`
 interface, so the pipeline is unchanged when you switch):
 - **`clip`** (default) — local CLIP zero-shot. No training/labels; scores each
-  crop against text prompts per mineral. Works on **any** rock type. This is the
-  recommended default.
+  crop against the granite descriptions. Works on any rock type. Recommended.
 - **`finetuned`** — a CNN trained on labeled thin-section crops (experimental;
   only 5 granite minerals — see *Training* and the caveats below).
 - **`claude`** — Claude vision API (optional; needs `ANTHROPIC_API_KEY`).
@@ -108,7 +115,9 @@ Outputs land in `outputs/<image_stem>_analysis/`:
 Key flags:
 - `--backend {clip,finetuned,claude}` — classifier (default `clip`)
 - `--checkpoint PATH` — trained-model weights for `--backend finetuned`
-- `--minerals {default,ultramafic}` — candidate mineral vocabulary (clip/claude)
+- `--minerals {granite,default,ultramafic}` — candidate mineral set (default
+  `granite`; clip/claude only). Edit `GRANITE_MINERALS` in `src/minerals.py` to
+  refine the diagnostic descriptions.
 - `--model {vit_b,vit_l,vit_h}` — SAM backbone
 - `--min-area N`, `--long-edge N`, `--points-per-side N` — segmentation tuning
 
@@ -195,9 +204,16 @@ python segment.py data\my_thin_section.jpg
 
 ## Notes & caveats
 
-- **Zero-shot (`clip`) accuracy is rough.** Generic CLIP hasn't seen many thin
-  sections, so labels are approximate and confidences low (~0.2–0.3). Useful as a
-  no-data default and for out-of-vocabulary rocks (e.g. ultramafic).
+- **Zero-shot (`clip`) accuracy is rough — even with the granite descriptions.**
+  Generic CLIP hasn't seen many thin sections, so confidences stay low (~0.2–0.3)
+  and entropy high. The diagnostic XPL descriptions in the `granite` preset are
+  the right lever and help at the margin (e.g. large quartz grains), but they
+  can't fully overcome zero-shot on this domain. The honest signal is the
+  uncertainty map, not the point labels.
+- **Unidentifiable grains.** Input is assumed granite (the 8 listed minerals).
+  Anything else still gets one of the 8 labels, but typically with high entropy /
+  low margin — set `--max-entropy` (or the dashboard cutoff) to push those to
+  `uncertain` instead of trusting them.
 - **The `finetuned` model is a proof of concept, not yet generalizable.** The
   public MUMDMC2025 *sample* contains only **1–2 distinct crystals per mineral**
   (imaged at many rotations), so high validation accuracy mostly reflects

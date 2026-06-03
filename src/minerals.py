@@ -15,8 +15,12 @@ from dataclasses import dataclass, field
 @dataclass(frozen=True)
 class Mineral:
     name: str
-    # Extra descriptive phrases fed to the text encoder alongside ``name``.
+    # Extra short synonyms fed to the text encoder alongside ``name``.
     aliases: tuple[str, ...] = field(default_factory=tuple)
+    # Full descriptive XPL captions (twinning, extinction, interference colors).
+    # These are the strongest zero-shot signal — CLIP matches images to text, so
+    # describing the diagnostic appearance beats a bare mineral name.
+    descriptions: tuple[str, ...] = field(default_factory=tuple)
 
 
 # Default label set. Ordered roughly by how common they are in igneous /
@@ -51,7 +55,77 @@ ULTRAMAFIC_MINERALS: tuple[Mineral, ...] = (
     Mineral("opaque mineral", ("magnetite", "ilmenite", "opaque oxide")),
 )
 
+# Granite-focused preset (8 minerals) with diagnostic XPL descriptions.
+# This is the primary target rock type. Descriptions encode the features a
+# petrographer uses to tell these apart under crossed polars.
+GRANITE_MINERALS: tuple[Mineral, ...] = (
+    Mineral(
+        "quartz",
+        descriptions=(
+            "quartz with first-order gray and white interference colors and wavy undulose extinction",
+            "a clear quartz grain with low gray birefringence and no twinning under crossed polars",
+        ),
+    ),
+    Mineral(
+        "plagioclase",
+        ("plagioclase feldspar",),
+        descriptions=(
+            "plagioclase feldspar with polysynthetic albite twinning forming alternating black and white parallel stripes",
+            "plagioclase showing zebra-stripe lamellar twinning and first-order gray interference colors",
+        ),
+    ),
+    Mineral(
+        "microcline",
+        ("microcline feldspar", "alkali feldspar"),
+        descriptions=(
+            "microcline alkali feldspar with cross-hatched tartan twinning resembling a plaid pattern",
+            "microcline showing distinctive grid twinning and first-order gray colors",
+        ),
+    ),
+    Mineral(
+        "orthoclase",
+        ("orthoclase feldspar", "alkali feldspar"),
+        descriptions=(
+            "orthoclase alkali feldspar with simple Carlsbad twinning dividing the crystal into two domains",
+            "orthoclase showing first-order gray interference colors and a single Carlsbad twin boundary",
+        ),
+    ),
+    Mineral(
+        "biotite",
+        ("biotite mica", "brown mica"),
+        descriptions=(
+            "brown biotite mica with high-order interference colors masked by strong brown body color",
+            "biotite showing one cleavage, parallel extinction, and a mottled bird's-eye texture near extinction",
+        ),
+    ),
+    Mineral(
+        "muscovite",
+        ("muscovite mica", "white mica"),
+        descriptions=(
+            "muscovite mica with bright high-order pink, blue, green and yellow interference colors",
+            "colorless muscovite showing vivid second to third-order birefringence and bird's-eye extinction",
+        ),
+    ),
+    Mineral(
+        "hornblende",
+        ("amphibole",),
+        descriptions=(
+            "green to brown hornblende amphibole with two cleavages intersecting at 56 and 124 degrees and inclined extinction",
+            "hornblende showing upper first-order interference colors partly masked by green-brown pleochroism",
+        ),
+    ),
+    Mineral(
+        "zircon",
+        ("zircon crystal",),
+        descriptions=(
+            "a tiny high-relief zircon crystal with extreme third to fourth-order interference colors",
+            "a small zircon inclusion inside biotite surrounded by a dark pleochroic halo",
+        ),
+    ),
+)
+
 PRESETS: dict[str, tuple[Mineral, ...]] = {
+    "granite": GRANITE_MINERALS,
     "default": DEFAULT_MINERALS,
     "ultramafic": ULTRAMAFIC_MINERALS,
 }
@@ -64,6 +138,9 @@ PROMPT_TEMPLATES: tuple[str, ...] = (
     "{} grain seen under a polarizing microscope",
     "photomicrograph of {} crystal in cross-polarized light",
 )
+
+# Wraps a full diagnostic description into an image-caption prompt for CLIP.
+DESCRIPTION_TEMPLATE = "a cross-polarized thin-section photomicrograph of {}"
 
 
 # "Non-grain" catch-all: things SAM segments that are NOT mineral grains —
@@ -101,6 +178,8 @@ def build_prompts(
     for m in minerals:
         phrases = (m.name, *m.aliases)
         prompts = [t.format(p) for p in phrases for t in PROMPT_TEMPLATES]
+        # Diagnostic descriptions (twinning/extinction/colors) — the strongest cues.
+        prompts += [DESCRIPTION_TEMPLATE.format(d) for d in m.descriptions]
         names.append(m.name)
         prompts_per_name.append(prompts)
     if include_non_grain:

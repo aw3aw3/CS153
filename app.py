@@ -42,9 +42,9 @@ backend = st.sidebar.selectbox(
          "finetuned = trained CNN (5 granite minerals only; experimental).",
 )
 preset = st.sidebar.selectbox(
-    "Mineral set", ["default", "ultramafic"],
-    help="Candidate minerals for the clip backend. Use 'ultramafic' for "
-         "olivine/pyroxene-rich rocks.",
+    "Mineral set", ["granite", "default", "ultramafic"],
+    help="Candidate minerals for the clip backend. 'granite' = the 8 granite "
+         "minerals with diagnostic XPL descriptions (recommended).",
     disabled=(backend == "finetuned"),
 )
 tta = st.sidebar.checkbox(

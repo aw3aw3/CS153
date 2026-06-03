@@ -39,8 +39,8 @@ def main() -> int:
                         "finetuned=trained CNN; claude=vision API)")
     p.add_argument("--checkpoint", type=Path, default=Path("checkpoints/mineral_cnn.pt"),
                    help="Trained-model checkpoint for --backend finetuned")
-    p.add_argument("--minerals", default="default",
-                   help="Mineral preset: 'default' or 'ultramafic'")
+    p.add_argument("--minerals", default="granite",
+                   help="Mineral preset: 'granite' (default), 'default', 'ultramafic'")
     p.add_argument("--model", choices=["vit_b", "vit_l", "vit_h"], default="vit_b",
                    help="SAM backbone (default vit_b)")
     p.add_argument("--long-edge", type=int, default=1024,
