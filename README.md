@@ -246,3 +246,15 @@ for s in result.summary.minerals:
 ```powershell
 python segment.py data\my_thin_section.jpg
 ```
+
+## AI Usage Disclosure
+
+AI tools were used during development of this project for:
+
+- **Wiring together the pipeline** — connecting the segmentation, classification,
+  and aggregation stages into a cohesive end-to-end flow.
+- **Searching for data** — locating a suitable labeled thin-section dataset
+  (MUMDMC2025) for training the mineral classifier.
+- **Debugging** — diagnosing and fixing errors across the codebase.
+- **Website scaffolding** — putting together the structure of the
+  Streamlit dashboard.
