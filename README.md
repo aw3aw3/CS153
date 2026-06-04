@@ -258,3 +258,24 @@ AI tools were used during development of this project for:
 - **Debugging** — diagnosing and fixing errors across the codebase.
 - **Website scaffolding** — putting together the structure of the
   Streamlit dashboard.
+
+## Citations
+
+**Dataset (MUMDMC2025)** — the granite thin-section photomicrographs used to
+train the classifier:
+
+> Amer, B. G., Mousa, H. M., Dawoud, M., & Youssef, A. (2025). A Photomicrographic
+> Dataset of Rocks for the Accurate Classification of Minerals. *Scientific Data*,
+> 12, 1775. https://doi.org/10.1038/s41597-025-05879-9
+
+**Segment Anything Model (SAM)** — grain segmentation:
+
+> Kirillov, A., Mintun, E., Ravi, N., Mao, H., Rolland, C., Gustafson, L., Xiao, T.,
+> Whitehead, S., Berg, A. C., Lo, W.-Y., Dollár, P., & Girshick, R. (2023). Segment
+> Anything. *arXiv preprint* arXiv:2304.02643. https://arxiv.org/abs/2304.02643
+
+**ResNet-18** — the classifier backbone:
+
+> He, K., Zhang, X., Ren, S., & Sun, J. (2016). Deep Residual Learning for Image
+> Recognition. *Proceedings of the IEEE Conference on Computer Vision and Pattern
+> Recognition (CVPR)*, 770–778. https://arxiv.org/abs/1512.03385
